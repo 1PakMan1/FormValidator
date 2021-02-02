@@ -1,2 +1,3 @@
+include ':formvalidator'
 include ':app'
 rootProject.name = "FormValidator"
