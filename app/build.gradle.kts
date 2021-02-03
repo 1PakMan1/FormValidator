@@ -8,7 +8,7 @@ plugins {
 
 android {
     defaultConfig {
-        applicationId = "ru.parkman.sample"
+        applicationId = "ru.parkman.formvalidator"
         minSdkVersion(ProjectVersion.minSdkVersion)
         targetSdkVersion(ProjectVersion.compileSdkVersion)
         compileSdkVersion(ProjectVersion.compileSdkVersion)
