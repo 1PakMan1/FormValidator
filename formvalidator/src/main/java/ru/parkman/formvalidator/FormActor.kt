@@ -3,8 +3,8 @@ package ru.parkman.formvalidator
 import com.badoo.mvicore.element.Actor
 import hu.akarnokd.rxjava3.bridge.RxJavaBridge
 import io.reactivex.rxjava3.core.Observable
-import io.reactivex.rxjava3.disposables.Disposable
 import io.reactivex.rxjava3.functions.BiFunction
+import io.reactivex.rxjava3.subjects.PublishSubject
 import ru.parkman.formvalidator.field.FormFieldState
 import ru.parkman.formvalidator.form.CommonForm
 import ru.parkman.formvalidator.form_validation.ValidationResult
@@ -18,14 +18,6 @@ import java.util.concurrent.TimeUnit
  * Created by Igor Park on 10/07/2020.
  */
 
-internal fun <T> Observable<T>.toRx2Observable(): io.reactivex.Observable<T> {
-    return RxJavaBridge.toV2Observable(this)
-}
-internal fun <T> Observable<T>.zipWithTimer(ms: Long): Observable<T> {
-    return this.zipWith(
-        Observable.timer(ms, TimeUnit.MILLISECONDS), BiFunction { t, _ -> t }
-    )
-}
 class FormActor<Form : CommonForm, Result : ValidationResult>(
     private val validator: Validator<Form, Result>,
     private val formStateMapper: Mapper2<Result, FormState, FormState>
@@ -35,7 +27,7 @@ class FormActor<Form : CommonForm, Result : ValidationResult>(
     FormFeature.Effect<Form>
     > {
 
-    private var delayedDisposable: Disposable? = null
+    private val interruptSignal = PublishSubject.create<Unit>()
 
     override fun invoke(
         state: FormFeature.State,
@@ -86,7 +78,7 @@ class FormActor<Form : CommonForm, Result : ValidationResult>(
         fieldInFocus: Qualifier?,
         withDelay: Boolean
     ): Observable<FormFeature.Effect<Form>> {
-        delayedDisposable?.dispose()
+        interruptSignal.onNext(Unit)
 
         val formStateErrorInvisible = validateForm(
             form = newForm,
@@ -118,9 +110,7 @@ class FormActor<Form : CommonForm, Result : ValidationResult>(
 
         return Observable.fromIterable<FormFeature.Effect<Form>>(formStatesSequence)
             .delayAfterFirst(delayDuration)
-            .doOnSubscribe {
-                delayedDisposable = it
-            }
+            .takeUntil(interruptSignal)
     }
 
     private fun FormState.updateFieldErrorVisibility(
@@ -166,5 +156,15 @@ class FormActor<Form : CommonForm, Result : ValidationResult>(
 
     companion object {
         private const val MIN_STATE_DELAY = 1000L
+    }
+
+    private fun <T> Observable<T>.toRx2Observable(): io.reactivex.Observable<T> {
+        return RxJavaBridge.toV2Observable(this)
+    }
+
+    private fun <T> Observable<T>.zipWithTimer(ms: Long): Observable<T> {
+        return this.zipWith(
+            Observable.timer(ms, TimeUnit.MILLISECONDS), BiFunction { t, _ -> t }
+        )
     }
 }
